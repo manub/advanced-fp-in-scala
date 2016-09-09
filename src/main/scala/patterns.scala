@@ -2,17 +2,53 @@ package lambdaconf.patterns
 
 import matryoshka._
 import monocle._
-import scalaz._
 
+import scalaz._
 import Scalaz._
+import scala.util.Try
+
+object lesson {
+  sealed trait Error
+  def readPortNumber: Error \/ Int = ???
+  def readHostname  : Error \/ String = ???
+
+  for {
+    portNumber <- readPortNumber
+    hostname <- readHostname
+//  } yield (portNumber, hostname): Error \/ (Int, String) // ??
+  } yield (portNumber, hostname): (Int, String) // ??
+}
 
 object exercise1 {
-  def readRowCol(): (Int, Int) = {
+  sealed trait Error
+  final case class NotANumber(value: String) extends Error
+
+  def readRowCol(): Error \/ (Int, Int) = {
+
+    def toInt(s: String): Error \/ Int = \/.fromTryCatchNonFatal(s.toInt).leftMap(_ => NotANumber(s))
+
     println("Please enter a row:")
     val row = readLine()
     println("Please enter a column:")
     val col = readLine()
-    (row.toInt, col.toInt)
+
+    for {
+      row <- toInt(row)
+      col <- toInt(col)
+    } yield (row, col)
+  }
+
+  def readRowCol2(): ValidationNel[Error, (Int, Int)] = { // validation non empty list
+
+    def toInt(s: String): ValidationNel[Error, Int] =
+      Validation.fromTryCatchNonFatal(s.toInt).leftMap(_ => NonEmptyList(NotANumber(s)))
+
+    println("Please enter a row:")
+    val row = readLine()
+    println("Please enter a column:")
+    val col = readLine()
+
+    (toInt(row) |@| toInt(col))((_, _)) // applicative builder
   }
 }
 
@@ -21,7 +57,14 @@ object exercise2 {
   final case object Root extends Node
   final case class Child(parent: Node, name: String) extends Node
 
-  implicit val NodeMonoid: Monoid[Node] = ???
+  implicit val NodeMonoid: Monoid[Node] = new Monoid[Node] {
+    override def zero: Node = Root
+    override def append(f1: Node, f2: => Node): Node = (f1, f2) match {
+      case (Root, y) => y
+      case (x, Root) => x
+      case (x, Child(p2, n2)) => Child(append(x, p2), n2)
+    }
+  }
 }
 
 object exercise3 {
