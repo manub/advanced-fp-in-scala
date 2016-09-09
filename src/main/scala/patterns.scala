@@ -68,20 +68,66 @@ object exercise2 {
 }
 
 object exercise3 {
-  final case class Thunk[A](run: () => A)
+  final case class IO[A](unsafePerformIO: () => A)
 
-  implicit val MonadThunk: Monad[Thunk] = ???
+  def readLine2: IO[String] = IO(() => readLine()) //no matter how many times you run this, it will **always** return a description of a computation
+
+  def printLine(line: String): IO[Unit] = IO(() => println(line))
+
+  implicit val MonadIO: Monad[IO] = new Monad[IO] {
+    override def bind[A, B](fa: IO[A])(f: (A) => IO[B]): IO[B] =
+    IO(() => f(fa.unsafePerformIO()).unsafePerformIO())
+//    f(fa.unsafePerformIO()) // non correct - f is called outside IO
+    override def point[A](a: => A): IO[A] = IO(() => a)
+  }
+
+  val program: IO[Unit] = for {
+    _ <- printLine("what is your name?")
+    name <- readLine2
+    _ <- printLine(s"Hello $name!")
+  } yield ()
+
+  def main(args: Array[String]) = program.unsafePerformIO()
 }
 
 object exercise4 {
   def filter[A](f: A => Boolean, l: List[A]): List[A] = {
     val foldable = Foldable[List]
 
-    ???
+    foldable.foldMap[A, List[A]](l)(a => if (f(a)) List(a) else Nil)
   }
 }
 
 object exercise5 {
+
+  // An example of Coyoneda...
+
+//  trait DeferMap[F[_], B] {
+//    type A
+//    val fusedMap: A => B
+//    val fa: F[A]
+//  }
+//  object DeferMap {
+//    def defer[F[_], A0](fa0: F[A0]): DeferMap[F, A0] = new DeferMap[F, A0] {
+//      type A = A0
+//      val fusedMap: A0 => A = identity
+//      val fa = fa0
+//    }
+//
+//    implicit def DeferMapFunctor[F[_]]: Functor[DeferMap[F, ?]] = new Functor[DeferMap[F, ?]] {
+//      override def map[A0, B0](fa: DeferMap[F, A0])(f: A0 => B0): DeferMap[F, B0] = new DeferMap[F, B0] {
+//        type A = fa.A
+//        val fusedMap = fa.fusedMap.andThen(f)
+//        val fa = fa.fa
+//      }
+//    }
+//
+//    val deferMap = defer[List, Int](List(1,2,3,4))
+//
+//   MAP FUSION!!!!
+//  }
+
+
   trait List[A] { self =>
     def fold[Z](nil: => Z, cons: (Z, A) => Z): Z
 

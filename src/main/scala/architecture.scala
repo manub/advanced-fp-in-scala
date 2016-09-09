@@ -6,6 +6,67 @@ import scalaz._
 
 import Scalaz._
 
+
+object exercise0 {
+
+
+
+  sealed trait Console[A]
+  case class Println(value: String) extends Console[Unit]
+  case class Readln[A](f: String => A) extends Console[A]
+  case class Bind[A, B](first: Console[A], second: A => Console[B]) extends Console[B] // => this is bind!!!
+
+
+  // ALMOST a monad... but we don't have point...
+
+  case class Return[A](value: A) extends Console[A] // this is point
+
+  val program: Console[Unit] = Bind(
+    Println("Hello, what's your name?"),
+    _ => Bind(
+      Readln(line => line),
+      name => Println(s"Hello $name")
+    )
+  )
+
+  implicit val MonadConsole: Monad[Console] = new Monad[Console] {
+    override def bind[A, B](fa: Console[A])(f: (A) => Console[B]): Console[B] = Bind(fa, f)
+    override def point[A](a: => A): Console[A] = Return(a)
+  }
+
+  // rewrite program!
+
+  for {
+    _    <- Println("Hello, what's your name?")
+    name <- Readln(identity)
+    _     <- Println(s"Hello $name")
+  } yield ()
+
+  // this makes me able to do functional mocking! I haven't even used a real console.
+
+
+  // THE FREE MONAD!!! behold
+
+//  sealed trait Free[F[_], A]
+//  case class Return[F[_], A](value: A) extends Free[F, A]
+//  case class Bind[F[_], A, B](first: Free[F, A], second: A => Free[F, B]) extends Free[F, B]  <- naive implementation of free
+
+  def printLine(line: String): Free[Console, Unit] = Free.liftF(line)
+  def readLine: Free[Console, String] = Free.liftF(Readln)
+
+  sealed trait FileIO[A]
+  case class Ls(path: String) extends FileIO[List[String]]
+
+  sealed trait Logging[A]
+  case class Log(level: String, message: String)
+
+  val program2: Free[Console[_] :+: FileIO[_] :+: Logging[_], Unit]
+
+  val eliminateLogging: Logging ~> FileIO
+
+  val program3: Free[Console :+: FileIO, Unit]
+
+}
 object exercise1 {
   final case class CashAmount()
   final case class AtmError(message: String)

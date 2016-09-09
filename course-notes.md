@@ -380,8 +380,8 @@ Other examples of *functors* are `Future[_]`, `Option[_]`, `Try[_]`.
 
 `F[A]` (or a functor) is a definition of a computation that may:
 
- - run
- - halt forever
+ - run forever
+ - halt 
  - produce one or more `As`
  
 e.g. `def some[A]: Some[A]` halt (what we can return???) but the one that runs forever is `def some[A]: Some[A] = some[A]` (infinite recursion)
@@ -462,3 +462,164 @@ in scalaz, cats: `F ~> G` (this is a type alias for `NaturalTransformation`)
 e.g. `None` is an empty list, `Some(x)` is `List(x)`
 
 it's not a typeclass! doesn't have any laws!!!
+
+(see `patterns.scala`)
+
+**Collections**
+
+`Foldable` and `Traversable`.
+
+```
+trait Foldable[F[_]] {
+    def foldMap[A, B](fa: F[A])(f: A => B)(implicit F: Monoid[B]): B
+    def foldRight[A, B](fa: F[A], z: => B)(f: (A, => B): B): B
+}
+```
+
+`foldMap` is more simple and powerful than `foldRight` or `foldLeft`
+
+`Future` is not `Traversable` in pure FP - you'd need to run the computation in order to perform a traversal. 
+
+a `List` is a `Free Monoid`. (you get a monoid for free!) `coyoneda -> free functor`
+
+
+**DATA**
+
+*Ordinary data* and *codata*. 
+
+*Data* is a finite store of information - a possibly recursive data structure (e.g. `List`). 
+
+*Codata* is the description of a process for producing information. E.g. `Stream`. *Fibonacci* numbers for example - we're dealing with a generator of numbers, not with the finite number of information!
+
+Processing data and codata is different.
+
+Data is usually processed in FP using recursion. Recursion is also called **induction** in this case. As we're dealing with data and not codata, we will reduce to the basic building blocks.
+
+**fold** is the most basic and powerful function to process data. It always terminates - because pure data is finite.
+
+The dual of fold is **cofold** - you use it in codata to generate elements. (e.g. you have a dough ball and you extract piece by piece - there's actually infinite pieces...)
+
+String is a **corecursive** data structure.
+
+Is data fundamental or necessary! NO!!! Not in FP. The core is lambda calculus. 
+
+Any data structure can be defined by a lambda - via **Church encoding**
+
+(see `data.scala`)
+
+
+the `Identity` monad is also useful!
+
+```
+val IdentityMonad = new Monad[Identity] {
+    override def bind[A, B](fa: Identity[A])(f: (A) => Identity[B]): Identity[B] = f(fa.value)
+    override def point[A](a: => A): Identity[A] = Identity(a)
+}
+```
+
+Lots of functions can do a lot of things for `Monad`s. By using `IdentityMonad` you can give those functions everything...
+
+`Option ~> Identity` is not possible - we'd need a value that we don't have right now. But `Identity ~> Option` is always possible!!!
+
+If `F ~> Identity` is defined it means that `F` has at least a value (some kind of traversable....)
+
+**Optics**
+
+`copy` it's a nice method for case classes. but what about nested classes? nested `copy` hell!
+
+you can use optics to explore sum and products. *monocle* is a useful library for this.
+
+**Lens** - is used to focus on a specific element of a product (e.g. case class)
+
+`case class Person(name: String)`
+
+`_Name: Lens[Person, String]`
+
+at the end of the day, a *lens* is a getter/setter really. it will return a copy.
+
+Let's say we have nested case classes.
+
+`case class Person(name: String, address: Adress)` 
+
+You can use nested lenses for `Address` -> and then combine lenses! `^|->`
+
+*Lenses* are useful for products... but what about sums? You have to use `Prism`!
+
+`Prism[S,A]`
+
+--- understand better
+
+**Recursive data types**
+
+```
+sealed trait List[A]
+
+case object Nil[A] extends List[A]
+case class Cons[A](head: A, tail: List[A]) extends List[A]
+```
+
+Different ways to implement fold! (in `List` - left or right? in `Tree` - breadth or depth?)
+
+*Recursion Schemes*
+
+*Catamorphisms* (tearing down a structure - fold!) and *Anamorphisms* (building up a structure)
+
+look in `data.scala` for examples
+
+**state monad!** (see `effects.scala`)
+
+
+**Reader**
+
+`case class Reader[R, A](run: R => A)`
+
+like a DI for functional programming!! we can use lenses to combine the effects.
+
+Have a look also at `*T` classes in Scalaz.
+
+**Monad transformers**
+
+Combine monadic effects. 
+
+`T[_[_], _]` is the generic structure of a Monad transformer. Its kind is `[* => *, *] => *` - where the first `* => *` is a Monad. This generates a monad when substituting the first Monad. `MT[_] == T[M[_], _]`
+
+Monad transformer lay some effects uponother.
+
+**Functional Architecture**
+
+*free monads* are an alternative to monad transformers.
+
+How could we run programs without thunk? In a pure FP world?
+
+We can *describe the interpretation*, and defer the execution to something else.
+
+`def println(s: String): Unit` it's a computation.
+
+```
+sealed trait Console
+case class Println(s: String) extends Console
+case class Ser(first: Console, second: Console) extends Console
+```
+
+it's a description of a computation - or a DSL to build strings?
+
+`architecture.scala`
+
+
+try to describe effects with a *minimal set* of interactions.
+
+What can we use Free monads for?
+
+- unit testing
+- mocking
+- aspects
+- separation of concerns => ONION architecture.
+- optimization
+
+
+Good example of code to look at:
+
+- Quasar-analytics/Quasar
+- Doobie
+- FreeK
+- Fcats

@@ -41,7 +41,7 @@ object exercise1 {
     def show: String = Debug[A].show(self)
   }
   implicit class DebugReadSyntax(self: String) {
-    def readIt[A: Debug] = Either[String, A] = Debug[A].read(self)
+    def readIt[A: Debug]: Either[String, A] = Debug[A].read(self)
   }
 
   def main(args: Array[String]) = {
